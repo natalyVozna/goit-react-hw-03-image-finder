@@ -1,5 +1,5 @@
 import { Component } from 'react';
-import { ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Container } from './App.styled';
 import { ImageGallery } from 'components/ImageGallery/ImageGallery';
@@ -14,10 +14,49 @@ export class App extends Component {
     search: '',
     page: 1,
     totalImg: 0,
+    loadMore: false,
   };
 
   async componentDidUpdate(prevProps, prevState) {
-    const { gallery } = this.state;
+    const { gallery, search, page, loadMore } = this.state;
+    if (prevState.search !== search || prevState.page !== page) {
+      this.setState({ status: Status.Loading });
+      try {
+        let resPhotos = null;
+        if (loadMore) {
+          resPhotos = await API.getPtotos({ q: search, page });
+          this.setState(({ gallery }) => ({
+            gallery: [...gallery, ...resPhotos.hits],
+            totalImg: resPhotos.total,
+            status: Status.Success,
+          }));
+        } else {
+          resPhotos = await API.getPtotos({ q: search, page: 1 });
+          this.setState({
+            gallery: resPhotos.hits,
+            status: Status.Success,
+            totalImg: resPhotos.total,
+          });
+          toast.success(`${resPhotos.totalHits} images found for your request`);
+        }
+
+        if (resPhotos.hits.length === 0) {
+          toast.error('Nothing found for your request');
+          throw new Error('Nothing found for your request');
+        }
+        // setStatus(Status.Success);
+        // this.setState({ page: 1 });
+        // const resPhotos = await API.getPtotos(params);
+        // this.setState({
+        //   gallery: resPhotos.hits,
+        //   status: Status.Success,
+        //   totalImg: resPhotos.total,
+        // });
+      } catch (error) {
+        this.setState({ status: Status.Error });
+      }
+    }
+
     if (prevState.gallery.length !== gallery.length) {
       const element = document.getElementById('loadMore');
       if (element) {
@@ -45,32 +84,21 @@ export class App extends Component {
     }
   };
 
-  handleChange = event => {
-    this.setState({ search: event.target.value });
-  };
-
-  handleSubmit = e => {
-    e.preventDefault();
-    const { search } = this.state;
-    this.fetchPhotos({ q: search });
+  handleSubmit = search => {
+    this.setState({
+      loadMore: false,
+      page: 1,
+      search,
+    });
   };
 
   handleLoadMore = async () => {
     const { search, page } = this.state;
     this.setState({ status: Status.Loading });
-    try {
-      this.setState(prevState => ({
-        page: prevState.page + 1,
-      }));
-      const resPhots = await API.getPtotos({ page: page + 1, q: search }); // content of page 2
-      this.setState(({ gallery }) => ({
-        gallery: [...gallery, ...resPhots.hits],
-        totalImg: resPhots.total,
-        status: Status.Success,
-      }));
-    } catch (error) {
-      this.setState({ status: Status.Error });
-    }
+    this.setState(prevState => ({
+      page: prevState.page + 1,
+      loadMore: true,
+    }));
   };
 
   render() {
@@ -79,12 +107,7 @@ export class App extends Component {
     return (
       <>
         <Container>
-          {/* <Searchbar onSubmitSearch={this.handleFormSubmit} onChangeSearch={ } search={ search} /> */}
-          <Searchbar
-            search={search}
-            onChangeSearch={this.handleChange}
-            onSubmitSearch={this.handleSubmit}
-          />
+          <Searchbar onSubmitSearch={this.handleSubmit} />
           <ImageGallery
             onLoadMore={this.handleLoadMore}
             search={search}
