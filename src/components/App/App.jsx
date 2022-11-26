@@ -93,7 +93,6 @@ export class App extends Component {
   };
 
   handleLoadMore = async () => {
-    const { search, page } = this.state;
     this.setState({ status: Status.Loading });
     this.setState(prevState => ({
       page: prevState.page + 1,
